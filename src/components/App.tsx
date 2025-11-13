@@ -10,6 +10,7 @@ import { ViewType } from '../types/navigation.js';
 import { StatusBar } from './StatusBar.js';
 import { NavBar } from './NavBar.js';
 import { SessionSwitchPrompt } from './SessionSwitchPrompt.js';
+import { HelpScreen } from './HelpScreen.js';
 import { DashboardView } from './views/DashboardView.js';
 import { EventsView } from './views/EventsView.js';
 import { ContextWindowView } from './views/ContextWindowView.js';
@@ -32,6 +33,8 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
   const [error, setError] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0); // 0 = newest event
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  const [showHelp, setShowHelp] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false); // Track if any modal/prompt is open
 
   const logManager = useMemo(() => new LogManager(), []);
   const sessionDiscovery = useMemo(() => new SessionDiscovery(logManager), [logManager]);
@@ -200,6 +203,18 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
 
   // Keyboard shortcuts
   useInput((input: string, key: Key) => {
+    // Help screen toggle
+    if (input === '?') {
+      setShowHelp(prev => !prev);
+      return;
+    }
+
+    // Close help screen with any key
+    if (showHelp) {
+      setShowHelp(false);
+      return;
+    }
+
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
     } else if (input === 'd') {
@@ -257,7 +272,7 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
     } else if (input === '5' && currentView === 'events') {
       toggleEventType('SessionEnd');
     }
-  });
+  }, { isActive: !isModalOpen && !showHelp });
 
   // Display error if exists
   if (error || connectionError) {
@@ -332,7 +347,7 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
       case 'context':
         return <ContextWindowView />;
       case 'git':
-        return <GitView />;
+        return <GitView session={session} terminalWidth={terminalWidth} onModalStateChange={setIsModalOpen} />;
       case 'todos':
         return <TodosView events={events} />;
       case 'otel':
@@ -342,19 +357,21 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
     }
   };
 
-  // Help text based on current view
+  // Help text based on current view (contextual only)
   const getHelpText = () => {
-    const baseHelp = 'd: dashboard | e: events | o: otel | w: context | g: git | t: todos | q: quit';
-
     if (pendingNewSession) {
-      return `s: switch to new session | i: ignore | ${baseHelp}`;
+      return 's: switch to new session | i: ignore | ?: help | q: quit';
     }
 
     if (currentView === 'events') {
-      return `${baseHelp} | ↑↓: scroll | f: toggle filters | c: clear | r: reset | 1-6: toggle types`;
+      return '↑↓: scroll | f: toggle filters | c: clear | r: reset | 1-6: toggle types | ?: help | q: quit';
     }
 
-    return baseHelp;
+    if (currentView === 'git') {
+      return '↑↓: select file | Enter: stage/unstage | Shift+A: stage all | Shift+C: commit | PgUp/PgDn: scroll diff | r: refresh | ?: help | q: quit';
+    }
+
+    return '?: help | q: quit';
   };
 
   return (
@@ -386,7 +403,14 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
       )}
 
       {/* View Content */}
-      {renderView()}
+      {!showHelp && renderView()}
+
+      {/* Help Screen */}
+      {showHelp && (
+        <Box flexGrow={1} padding={2}>
+          <HelpScreen />
+        </Box>
+      )}
 
       {/* Help Footer */}
       <Box borderStyle="single" borderColor={inkColors.border} paddingX={1}>
