@@ -1,0 +1,45 @@
+{
+  "name": "claude-commander",
+  "version": "1.0.0",
+  "description": "Real-time TUI monitor for Claude Code hook events",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "claude-commander": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.tsx",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "claude-code",
+    "tui",
+    "monitoring",
+    "hooks"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ink": "^4.4.1",
+    "react": "^18.2.0",
+    "ink-text-input": "^5.0.1",
+    "ink-select-input": "^5.0.0",
+    "chalk": "^5.3.0",
+    "date-fns": "^3.6.0"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./hooks": "./dist/hooks/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0",
+    "tsx": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
