@@ -22,8 +22,7 @@ export function formatAbsoluteTime(timestamp: number): string {
  */
 export function getEventTypeLabel(eventType: string): string {
   const labels: Record<string, string> = {
-    PreToolUse: 'Before',
-    PostToolUse: 'After',
+    ToolUse: 'Tool',
     UserPromptSubmit: 'Prompt',
     Stop: 'Stop',
     SubagentStop: 'SubStop',
@@ -71,7 +70,7 @@ export function truncate(text: string, maxLength: number): string {
 /**
  * Format tool input for single-line display
  */
-function formatToolInputCompact(input: Record<string, unknown>, basePath?: string): string {
+function formatToolInputCompact(input: Record<string, unknown>, basePath?: string, toolName?: string): string {
   if (!input || Object.keys(input).length === 0) {
     return '';
   }
@@ -91,7 +90,20 @@ function formatToolInputCompact(input: Record<string, unknown>, basePath?: strin
     }
   }
 
-  // For multiple parameters, show key names
+  // Special handling for common multi-parameter tools
+  // Show the most important parameter (usually file path or command)
+  const priorityKeys = ['file_path', 'notebook_path', 'command', 'pattern', 'url', 'query', 'path'];
+
+  for (const key of priorityKeys) {
+    if (key in processedInput) {
+      const value = processedInput[key];
+      if (typeof value === 'string') {
+        return truncate(value, 80);
+      }
+    }
+  }
+
+  // For multiple parameters without priority key, show key names
   const keys = entries.slice(0, 3).map(([k]) => k).join(', ');
   return entries.length > 3 ? `${keys}, ...` : keys;
 }
@@ -101,48 +113,59 @@ function formatToolInputCompact(input: Record<string, unknown>, basePath?: strin
  */
 export function getEventSummary(event: HookEvent, basePath?: string): string {
   switch (event.eventType) {
-    case 'PreToolUse':
-      const preToolName = 'toolName' in event ? event.toolName : 'Unknown';
-      const preInput = 'toolInput' in event ? formatToolInputCompact(event.toolInput as Record<string, unknown>, basePath) : '';
-      return preInput ? `${preToolName} → ${preInput}` : preToolName;
-
-    case 'PostToolUse':
-      const postToolName = 'toolName' in event ? event.toolName : 'Unknown';
+    case 'ToolUse':
+      const toolName = 'toolName' in event ? event.toolName : 'Unknown';
+      const input = 'toolInput' in event ? formatToolInputCompact(event.toolInput as Record<string, unknown>, basePath, toolName) : '';
       const duration = 'duration' in event && event.duration ? ` (${event.duration}ms)` : '';
-      const postInput = 'toolInput' in event ? formatToolInputCompact(event.toolInput as Record<string, unknown>, basePath) : '';
 
-      // Show exit code if hook was executed
-      const exitCode = 'hookExitCode' in event && event.hookExitCode !== undefined
-        ? ` [exit: ${event.hookExitCode}]`
-        : '';
-
-      return postInput
-        ? `${postToolName}${duration}${exitCode} → ${postInput}`
-        : `${postToolName}${duration}${exitCode}`;
+      return input ? `${toolName}${duration} → ${input}` : `${toolName}${duration}`;
 
     case 'UserPromptSubmit':
-      const prompt = 'prompt' in event ? truncate(event.prompt, 100) : '';
-      return prompt;
+      const rawPrompt = 'prompt' in event ? event.prompt : '';
+
+      // For multi-line prompts, show first line with indicator
+      const lines = rawPrompt.split('\n').filter(line => line.trim());
+      if (lines.length > 1) {
+        return truncate(lines[0], 90) + ' [...]';
+      }
+
+      return truncate(rawPrompt, 100);
 
     case 'Notification':
-      const notifType = 'notificationType' in event ? `[${event.notificationType}]` : '';
+      const notifType = 'notificationType' in event ? event.notificationType : '';
       const message = 'message' in event ? event.message : '';
-      return `${notifType} ${truncate(message, 80)}`.trim();
+
+      // Format notification type in a more readable way
+      const formattedType = notifType
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
+      return formattedType ? `${formattedType}: ${truncate(message, 70)}` : truncate(message, 80);
 
     case 'Stop':
       const stopReason = 'reason' in event && event.reason ? event.reason : 'User stopped';
-      return stopReason;
+      const stopHookActive = 'stopHookActive' in event && event.stopHookActive ? ' [hook active]' : '';
+      return `${stopReason}${stopHookActive}`;
 
     case 'SubagentStop':
       const subReason = 'reason' in event && event.reason ? event.reason : 'Subagent stopped';
-      return subReason;
+      const subHookActive = 'stopHookActive' in event && event.stopHookActive ? ' [hook active]' : '';
+      return `${subReason}${subHookActive}`;
+
+    case 'PreCompact':
+      const trigger = 'trigger' in event ? event.trigger : 'unknown';
+      const hasInstructions = 'customInstructions' in event && event.customInstructions ? ' (with instructions)' : '';
+      return `${trigger} compact${hasInstructions}`;
 
     case 'SessionStart':
+      const source = 'source' in event ? `[${event.source}]` : '';
       const cwd = event.cwd ? `cwd: ${truncate(makePathRelative(event.cwd, basePath), 60)}` : '';
-      return cwd;
+      return `${source} ${cwd}`.trim();
 
     case 'SessionEnd':
-      return 'Session terminated';
+      const endReason = 'reason' in event && event.reason ? ` (${event.reason})` : '';
+      return `Session terminated${endReason}`;
 
     default:
       return '';

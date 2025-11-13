@@ -5,15 +5,18 @@ import { SessionDiscovery } from '../log/SessionDiscovery.js';
 import { Session } from '../types/events.js';
 import { useEvents } from '../state/useEvents.js';
 import { useFilters } from '../state/useFilters.js';
+import { useOtelMetrics } from '../state/useOtelMetrics.js';
 import { ViewType } from '../types/navigation.js';
 import { StatusBar } from './StatusBar.js';
 import { NavBar } from './NavBar.js';
 import { SessionSwitchPrompt } from './SessionSwitchPrompt.js';
 import { DashboardView } from './views/DashboardView.js';
-import { HooksView } from './views/HooksView.js';
+import { EventsView } from './views/EventsView.js';
 import { ContextWindowView } from './views/ContextWindowView.js';
 import { GitView } from './views/GitView.js';
 import { TodosView } from './views/TodosView.js';
+import { OtelDashboard } from './OtelDashboard.js';
+import { getDefaultCollectorPaths } from '../otel/CollectorConfigGenerator.js';
 import { colors, inkColors } from '../theme/colors.js';
 
 interface AppProps {
@@ -103,6 +106,22 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
     clearFilters
   } = useFilters(events);
 
+  // OTel Metrics
+  const otelPaths = useMemo(() => {
+    if (!session) return { logsPath: null, metricsPath: null };
+    const paths = getDefaultCollectorPaths(session.sessionId);
+    return {
+      logsPath: paths.logsPath,
+      metricsPath: paths.metricsPath,
+    };
+  }, [session?.sessionId]);
+
+  const { metrics: otelMetrics, isConnected: otelConnected } = useOtelMetrics(
+    session?.sessionId || '',
+    otelPaths.logsPath,
+    otelPaths.metricsPath
+  );
+
   // Only auto-scroll to newest event if user is already at the newest position
   // If user has scrolled back, maintain their position
   useEffect(() => {
@@ -186,9 +205,9 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
     } else if (input === 'd') {
       // Switch to Dashboard view
       setCurrentView('dashboard');
-    } else if (input === 'h') {
-      // Switch to Hooks view
-      setCurrentView('hooks');
+    } else if (input === 'e') {
+      // Switch to Events view
+      setCurrentView('events');
     } else if (input === 'w') {
       // Switch to Context Window view
       setCurrentView('context');
@@ -198,11 +217,14 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
     } else if (input === 't') {
       // Switch to Todos view
       setCurrentView('todos');
-    } else if (key.upArrow && currentView === 'hooks') {
-      // Scroll up to older events (only in Hooks view)
+    } else if (input === 'o') {
+      // Switch to OTel view
+      setCurrentView('otel');
+    } else if (key.upArrow && currentView === 'events') {
+      // Scroll up to older events (only in Events view)
       setSelectedIndex((prev) => Math.min(prev + 1, filteredEvents.length - 1));
-    } else if (key.downArrow && currentView === 'hooks') {
-      // Scroll down to newer events (only in Hooks view)
+    } else if (key.downArrow && currentView === 'events') {
+      // Scroll down to newer events (only in Events view)
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
     } else if (pendingNewSession && input === 's') {
       // Switch to new session
@@ -213,28 +235,26 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
     } else if (error && input === 'r') {
       // Retry connection when in error state
       retryConnection();
-    } else if (input === 'f' && currentView === 'hooks') {
-      // Toggle filters (only in Hooks view)
+    } else if (input === 'f' && currentView === 'events') {
+      // Toggle filters (only in Events view)
       setShowFilters(!showFilters);
-    } else if (input === 'c' && currentView === 'hooks') {
-      // Clear events (only in Hooks view)
+    } else if (input === 'c' && currentView === 'events') {
+      // Clear events (only in Events view)
       setSelectedIndex(0); // Reset scroll position when clearing
       clearEvents();
-    } else if (input === 'r' && !error && currentView === 'hooks') {
-      // Reset filters (only in Hooks view)
+    } else if (input === 'r' && !error && currentView === 'events') {
+      // Reset filters (only in Events view)
       setSelectedIndex(0); // Reset scroll position when resetting filters
       clearFilters();
-    } else if (input === '1' && currentView === 'hooks') {
-      toggleEventType('PreToolUse');
-    } else if (input === '2' && currentView === 'hooks') {
-      toggleEventType('PostToolUse');
-    } else if (input === '3' && currentView === 'hooks') {
+    } else if (input === '1' && currentView === 'events') {
+      toggleEventType('ToolUse');
+    } else if (input === '2' && currentView === 'events') {
       toggleEventType('UserPromptSubmit');
-    } else if (input === '4' && currentView === 'hooks') {
+    } else if (input === '3' && currentView === 'events') {
       toggleEventType('Notification');
-    } else if (input === '5' && currentView === 'hooks') {
+    } else if (input === '4' && currentView === 'events') {
       toggleEventType('SessionStart');
-    } else if (input === '6' && currentView === 'hooks') {
+    } else if (input === '5' && currentView === 'events') {
       toggleEventType('SessionEnd');
     }
   });
@@ -245,7 +265,7 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
       <Box flexDirection="column" padding={1} width={terminalWidth} height={terminalHeight}>
         <Box borderStyle="double" borderColor={inkColors.warning} paddingX={2} paddingY={1} marginBottom={1}>
           <Text bold color={inkColors.warning}>
-            Claude Commander - Waiting for Session
+            Claude Companion - Waiting for Session
           </Text>
         </Box>
 
@@ -271,7 +291,7 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
 
         <Box flexDirection="column" marginY={1} paddingX={1}>
           <Text color={inkColors.dim}>Make sure hooks are configured:</Text>
-          <Text color={inkColors.dim}>  • Run <Text bold>claude-commander setup</Text> if you haven't</Text>
+          <Text color={inkColors.dim}>  • Run <Text bold>claude-companion setup</Text> if you haven't</Text>
           <Text color={inkColors.dim}>  • Check <Text bold>~/.claude/settings.json</Text> has hooks configured</Text>
         </Box>
 
@@ -295,9 +315,9 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
             eventCount={events.length}
           />
         );
-      case 'hooks':
+      case 'events':
         return (
-          <HooksView
+          <EventsView
             session={session}
             filteredEvents={filteredEvents}
             filterState={filterState}
@@ -315,6 +335,8 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
         return <GitView />;
       case 'todos':
         return <TodosView events={events} />;
+      case 'otel':
+        return <OtelDashboard metrics={otelMetrics} isConnected={otelConnected} />;
       default:
         return null;
     }
@@ -322,13 +344,13 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
 
   // Help text based on current view
   const getHelpText = () => {
-    const baseHelp = 'd: dashboard | h: hooks | w: context | g: git | t: todos | q: quit';
+    const baseHelp = 'd: dashboard | e: events | o: otel | w: context | g: git | t: todos | q: quit';
 
     if (pendingNewSession) {
       return `s: switch to new session | i: ignore | ${baseHelp}`;
     }
 
-    if (currentView === 'hooks') {
+    if (currentView === 'events') {
       return `${baseHelp} | ↑↓: scroll | f: toggle filters | c: clear | r: reset | 1-6: toggle types`;
     }
 
@@ -340,7 +362,7 @@ export const App: React.FC<AppProps> = ({ sessionId: providedSessionId }) => {
       {/* Header */}
       <Box borderStyle="double" borderColor={inkColors.borderAccent} paddingX={1}>
         <Text bold color={inkColors.borderAccent}>
-          Claude Commander
+          Claude Companion
         </Text>
       </Box>
 

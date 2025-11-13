@@ -30,7 +30,7 @@ export const SetupPrompt: React.FC<SetupPromptProps> = ({ onRunSetup, onContinue
 
       <Box flexDirection="column" marginY={1} paddingX={1}>
         <Text>
-          Claude Commander needs hooks to be configured in Claude Code to receive events.
+          Claude Companion needs hooks to be configured in Claude Code to receive events.
         </Text>
       </Box>
 
@@ -84,7 +84,7 @@ export const SetupPrompt: React.FC<SetupPromptProps> = ({ onRunSetup, onContinue
       <Box marginTop={1} paddingX={1}>
         <Text color={inkColors.dim}>
           💡 Tip: You can also run{' '}
-          <Text bold>claude-commander setup</Text> manually at any time.
+          <Text bold>claude-companion setup</Text> manually at any time.
         </Text>
       </Box>
     </Box>

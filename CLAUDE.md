@@ -1,10 +1,12 @@
+<!-- Last updated: 2025-11-13 | Commit: 232786c | Scope: . -->
+
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Claude Code guidance for this repository.
 
-## Project Overview
+## Project
 
-Claude Commander is a real-time TUI (Terminal User Interface) monitoring tool for Claude Code hook events. It uses a JSONL log file-based architecture to achieve sub-10ms latency event display without requiring daemon processes.
+Real-time TUI monitoring for Claude Code hook events. JSONL log file architecture, sub-10ms latency, no daemon processes.
 
 ## Build & Development Commands
 
@@ -23,20 +25,20 @@ npm run type-check
 
 # Test the CLI locally (after build)
 npm link
-claude-commander
+claude-companion
 
 # Run specific session
-claude-commander <session-id>
+claude-companion <session-id>
 
 # Run setup wizard
-claude-commander setup
+claude-companion setup
 ```
 
 ## Architecture
 
-### Core Communication Flow
+### Communication Flow
 
-The project uses a **log file-based event system** instead of named pipes or sockets:
+Log file-based event system:
 
 ```
 Claude Code Process
@@ -44,117 +46,180 @@ Claude Code Process
   HookWriter (src/hooks/HookWriter.ts)
       ↓ (writes JSONL)
   ~/.claude-code/hooks/<session-id>.jsonl
-      ↓ (fs.watch + tail -f style)
+      ↓ (fs.watch + tail -f)
   LogReader (src/log/LogReader.ts)
       ↓ (EventEmitter)
   React TUI Components
 ```
 
-**Key principle**: Each Claude Code session gets its own isolated log file identified by a unique session ID. The TUI uses `fs.watch()` to detect file changes and only reads new content (tail -f behavior), providing real-time monitoring with minimal overhead.
+Each session has isolated log file by session ID. `fs.watch()` detects changes, reads only new content.
 
 ### Session Management
 
-Session lifecycle is managed through three components:
+- **LogManager** (`src/log/LogManager.ts`): Log paths, `.meta` files, stale cleanup via PID checks
+- **SessionDiscovery** (`src/log/SessionDiscovery.ts`): Scans `~/.claude-code/hooks/` for `.jsonl`, validates via PID
+- **LogReader** (`src/log/LogReader.ts`): EventEmitter, tail-f via file size tracking
 
-1. **LogManager** (`src/log/LogManager.ts`): Handles log file paths, metadata files (`.meta`), and stale session cleanup using PID checks
-2. **SessionDiscovery** (`src/log/SessionDiscovery.ts`): Discovers active sessions by scanning `~/.claude-code/hooks/` for `.jsonl` files, validates sessions using PIDs from metadata
-3. **LogReader** (`src/log/LogReader.ts`): Reads events from log files using EventEmitter pattern, implements tail-f style reading by tracking file size and only reading new bytes
+### Hook Writer Modes
 
-### Hook Writer (Two Modes)
+1. **Bash Script** (recommended): `~/.config/claude-code/claude-companion-hook.sh` receives JSON via stdin
+2. **TypeScript Module**: Import `claude-companion/hooks`, use `HookWriter` in `hooks.ts`
 
-Users can configure hooks in two ways:
+Both write same JSONL format.
 
-1. **Bash Script Mode** (recommended): `~/.config/claude-code/claude-commander-hook.sh` receives hook events as JSON via stdin and appends to log files
-2. **TypeScript Module Mode**: Imports `claude-commander/hooks` and uses `HookWriter` class directly in `hooks.ts`
+### Event Types
 
-Both modes write to the same JSONL format, ensuring compatibility.
-
-### Event Types System
-
-All events extend `BaseHookEvent` (src/types/events.ts):
-- `PreToolUse` / `PostToolUse`: Tool execution lifecycle
+All extend `BaseHookEvent` (src/types/events.ts):
+- `ToolUse`: Tool execution (unified from PreToolUse/PostToolUse)
 - `UserPromptSubmit`: User messages
-- `SessionStart` / `SessionEnd`: Session boundaries
+- `SessionStart`/`SessionEnd`: Session boundaries
 - `Notification`, `Stop`, `SubagentStop`, `PreCompact`: System events
 
-Events are strongly typed using discriminated unions for type safety across the stack.
+Discriminated unions for type safety.
 
-### React Component Architecture
+#### Hook Response Capture
 
-Built with Ink (React for CLIs):
+Captures both input and output:
 
-- **App.tsx**: Root component, manages session switching logic, keyboard shortcuts
-- **EventList.tsx**: Virtualized event display
-- **EventItem.tsx**: Individual event rendering with color-coded types
-- **FilterBar.tsx**: Toggle display for event type filters (1-6 keys)
-- **StatusBar.tsx**: Shows session info, connection status, keyboard hints
-- **SessionSwitchPrompt.tsx**: Modal prompt when new session detected
+**Input**: Event metadata (type, timestamp, sessionId, cwd, permissionMode), event payloads, session context (cli/vscode)
 
-State management uses React hooks:
-- `useEvents` (src/state/useEvents.ts): Event collection, filtering, LogReader integration
-- `useFilters` (src/state/useFilters.ts): Filter state for event types
+**Output** (`hookResponse` field):
+- `exitCode`: 0=success, 2=block, other=error
+- `stdout`/`stderr`: Console output
+- `permissionDecision`: ToolUse ("allow"/"deny"/"ask")
+- `updatedInput`: Tool parameter modifications
 
-## Important Implementation Details
+HookWriter auto-captures responses. EventItem shows status (✓/✗) and alterations.
 
-### File Watching & Performance
+### React Components
 
-LogReader uses `fs.watch()` on the JSONL file and tracks file size to avoid re-reading content. When a change event fires, it:
-1. Gets current file size
-2. Reads only bytes from `lastSize` to `currentSize`
-3. Parses new lines as JSON
-4. Emits events to subscribers
+Ink (React for CLIs):
 
-This provides ~1ms latency from write to display.
+- **App.tsx**: Root, session switching, keyboard shortcuts
+- **EventList.tsx**: Virtualized display
+- **EventItem.tsx**: Event rendering, color-coded
+- **FilterBar.tsx**: Type filters (1-6 keys)
+- **StatusBar.tsx**: Session info, status, hints
+- **SessionSwitchPrompt.tsx**: New session modal
+
+State hooks:
+- `useEvents`: Event collection, filtering, LogReader
+- `useFilters`: Filter state
+
+#### Event Display
+
+EventItem visualization:
+
+**Status**: `✓` (green, exitCode 0), `✗` (red, non-zero)
+
+**Permission Decisions**: `[✓ allow]` (dim), `[✗ deny]` (dim), `[? ask]` (dim)
+
+**Alterations**: `[ALTERED: key1, key2]` (yellow)
+
+**Tool Formatting**:
+- Edit/Write/Read: Shows `file_path`
+- Bash: Shows `command`
+- Grep: Shows `pattern`
+- WebFetch: Shows `url`
+- Single-param tools: Shows value
+- Multi-param tools: Shows priority parameter (file_path, command, pattern, url, path)
+
+## Implementation Details
+
+### File Watching
+
+LogReader with `fs.watch()`:
+1. Get current file size
+2. Read bytes from `lastSize` to `currentSize`
+3. Parse JSON lines
+4. Emit events
+
+~1ms latency.
 
 ### Metadata Files
 
-Each session has two files:
-- `<session-id>.jsonl`: Event data (one JSON object per line)
-- `<session-id>.meta`: Session metadata (PID, start time, cwd, user)
+- `<session-id>.jsonl`: Event data (JSONL)
+- `<session-id>.meta`: PID, start time, cwd, user
 
-Metadata enables session validation (check if PID is alive) and automatic cleanup of stale logs.
+Enables PID validation and stale cleanup.
 
-### Session Discovery & Switching
+### Session Discovery
 
-On startup, SessionDiscovery:
-1. Scans `~/.claude-code/hooks/` for `.jsonl` files
-2. Reads corresponding `.meta` files
-3. Validates PIDs using `process.kill(pid, 0)`
-4. Returns active sessions sorted by start time
+1. Scan `~/.claude-code/hooks/` for `.jsonl`
+2. Read `.meta` files
+3. Validate PIDs via `process.kill(pid, 0)`
+4. Return sessions sorted by start time
 
-App component watches for new sessions while monitoring and prompts user to switch (press `s`) when detected.
+App watches for new sessions, prompts switch (`s`).
 
 ### Setup Wizard
 
-`src/setup/` contains interactive setup flow:
-- **HookChecker**: Detects existing hook configurations
-- **HookConfigGenerator**: Generates `hooks.json` or `hooks.ts` files based on user choices
-- Supports both user-wide (`~/.config/claude-code/`) and project-specific (`./.claude/`) installation
+`src/setup/`:
+- **HookChecker**: Detects existing configs
+- **HookConfigGenerator**: Generates `hooks.json`/`hooks.ts`
+- Supports user-wide (`~/.config/claude-code/`) and project (`./.claude/`)
+
+**Modes**:
+1. **Bash Script** (recommended): `hooks.json` + bash script, lower overhead
+2. **TypeScript Module**: `hooks.ts` imports `claude-companion/hooks`, type safety
+
+**Behavior**:
+- Auto-offers setup on first run without hooks
+- Detects conflicts, offers backup
+- Captures ALL event types
+- Installs example: `examples/claude-companion-hook.sh`
 
 ## Module Exports
 
-The package exports two entry points (see package.json):
 - `.` → `dist/index.js` (CLI)
-- `./hooks` → `dist/hooks/index.js` (HookWriter for TypeScript hooks)
+- `./hooks` → `dist/hooks/index.js` (HookWriter)
 
-Users can import with: `import { getHookWriter } from 'claude-commander/hooks'`
+Import: `import { getHookWriter } from 'claude-companion/hooks'`
 
-## TypeScript Configuration
+## TypeScript Config
 
-- Target: ES2022 (Node.js 18+)
-- Module: Node16 (ESM with .js extensions in imports)
-- JSX: react (for Ink components)
-- Strict mode enabled
-- All imports must use `.js` extension even though source is `.ts` (Node16 module resolution)
+- Target: ES2022 (Node 18+)
+- Module: Node16 (ESM with .js imports)
+- JSX: react (Ink)
+- Strict mode
+- Imports require `.js` extension (Node16 resolution)
 
-## Testing Approach
+## Development
 
-When testing locally:
-1. Build with `npm run build`
-2. Link globally with `npm link`
+### Adding Event Types
+
+1. **Update** `src/types/events.ts`: Add interface extending `BaseHookEvent`, include in union
+2. **Update** `src/components/EventItem.tsx`: Add rendering logic, color coding
+3. **Update** `src/setup/HookConfigGenerator.ts`: Add to generated configs
+4. **Test**: Trigger event, verify TUI display, check JSONL format
+
+### Common Issues
+
+**Events not appearing**:
+- Check `~/.config/claude-code/hooks.json` exists
+- Verify logs in `~/.claude-code/hooks/` match session ID
+
+**TypeScript import errors**:
+- Use `.js` extension: `import { Foo } from './bar.js'`
+- Required by Node16/ESM resolution
+
+**Hook responses missing**:
+- Ensure script echoes response JSON to stdout
+- Check `hookResponse` field in JSONL
+
+### Performance
+
+- **Log Growth**: Unbounded, acceptable <1000 events
+- **File Watch**: Multiple events per write, mitigated by size tracking, <1ms latency
+- **Filtering**: In React, not at read, negligible <10,000 events
+
+## Testing
+
+1. `npm run build`
+2. `npm link`
 3. Start Claude Code session
-4. Run `claude-commander` to connect
-5. Verify events appear in TUI
-6. Check log files: `ls -la ~/.claude-code/hooks/`
+4. Run `claude-companion`
+5. Verify TUI events
+6. Check logs: `ls -la ~/.claude-code/hooks/`
 
-For debugging event flow, add temporary logs to HookWriter or LogReader.
+Debug: Add logs to HookWriter/LogReader.

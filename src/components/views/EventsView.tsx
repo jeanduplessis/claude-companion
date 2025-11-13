@@ -6,7 +6,7 @@ import { FilterBar } from '../FilterBar.js';
 import { EventList } from '../EventList.js';
 import { EventDetail } from '../EventDetail.js';
 
-interface HooksViewProps {
+interface EventsViewProps {
   session: Session | null;
   filteredEvents: HookEvent[];
   filterState: FilterState;
@@ -18,7 +18,7 @@ interface HooksViewProps {
   onToggleEventType: (eventType: HookEventType) => void;
 }
 
-export const HooksView: React.FC<HooksViewProps> = ({
+export const EventsView: React.FC<EventsViewProps> = ({
   session,
   filteredEvents,
   filterState,

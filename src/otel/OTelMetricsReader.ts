@@ -1,15 +1,27 @@
 import fs from 'fs';
 import { EventEmitter } from 'events';
-import { HookEvent } from '../types/events.js';
+import { parseOTLPMetricLine, ParsedOTelMetric } from './OtlpParser.js';
+import { OTelMetricUpdateEvent } from '../types/events.js';
+import { nanoid } from 'nanoid';
 
-export class LogReader extends EventEmitter {
+/**
+ * Reads and parses OpenTelemetry metrics files (OTLP JSON format)
+ * Emits metric update events compatible with existing HookEvent structure
+ */
+export class OTelMetricsReader extends EventEmitter {
   private logPath: string | null = null;
   private isOpen: boolean = false;
   private fileWatcher: fs.FSWatcher | null = null;
   private fileSize: number = 0;
+  private sessionId: string;
+
+  constructor(sessionId: string) {
+    super();
+    this.sessionId = sessionId;
+  }
 
   /**
-   * Open the log file and start reading events (tail -f style)
+   * Open the OTel metrics file and start reading (tail -f style)
    */
   openLog(logPath: string): void {
     if (this.isOpen) {
@@ -82,7 +94,7 @@ export class LogReader extends EventEmitter {
   }
 
   /**
-   * Handle a line from the log
+   * Handle a line from the metrics file (OTLP JSON format)
    */
   private handleLine(line: string): void {
     if (!line.trim()) {
@@ -90,27 +102,39 @@ export class LogReader extends EventEmitter {
     }
 
     try {
-      const event = JSON.parse(line) as any;
+      const parsedMetrics = parseOTLPMetricLine(line);
 
-      // Skip PreToolUse events - we only want PostToolUse (which has duration/result)
-      // to avoid duplicates since both fire for every tool
-      if (event.eventType === 'PreToolUse') {
-        return;
+      for (const metric of parsedMetrics) {
+        const event = this.transformToHookEvent(metric);
+        if (event) {
+          this.emit('metric', event);
+        }
       }
-
-      // Transform PostToolUse to ToolUse for backward compatibility
-      if (event.eventType === 'PostToolUse') {
-        event.eventType = 'ToolUse';
-      }
-
-      this.emit('event', event as HookEvent);
     } catch (error) {
       this.emit('parse-error', { line, error });
     }
   }
 
   /**
-   * Close the log file and stop watching
+   * Transform parsed OTLP metric to HookEvent format
+   */
+  private transformToHookEvent(metric: ParsedOTelMetric): OTelMetricUpdateEvent {
+    return {
+      id: nanoid(),
+      eventType: 'OTelMetricUpdate',
+      timestamp: metric.timestamp ? metric.timestamp.getTime() : Date.now(),
+      sessionId: metric.sessionId || this.sessionId,
+      cwd: metric.resourceAttributes.cwd as string | undefined,
+      permissionMode: metric.resourceAttributes.permission_mode as string | undefined,
+      metricName: metric.metricName,
+      value: metric.value,
+      unit: metric.unit,
+      attributes: metric.metricAttributes,
+    };
+  }
+
+  /**
+   * Close the metrics file and stop watching
    */
   close(): void {
     if (this.fileWatcher) {
@@ -124,7 +148,7 @@ export class LogReader extends EventEmitter {
   }
 
   /**
-   * Check if the log reader is open
+   * Check if the metrics reader is open
    */
   isReaderOpen(): boolean {
     return this.isOpen;

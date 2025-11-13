@@ -1,4 +1,4 @@
-import { HookEvent, PostToolUseEvent } from '../types/events.js';
+import { HookEvent, ToolUseEvent } from '../types/events.js';
 
 export interface TodoItem {
   content: string;
@@ -32,21 +32,20 @@ function isValidTodoItem(item: unknown): item is TodoItem {
 }
 
 /**
- * Extract the most recent TodoWrite snapshot from PostToolUse events
- * Only processes "After" tool call events (PostToolUse), not "Before" (PreToolUse)
+ * Extract the most recent TodoWrite snapshot from ToolUse events
  */
 export function extractLatestTodos(events: HookEvent[]): TodosSnapshot | null {
-  // Find the most recent PostToolUse event where toolName === 'TodoWrite'
+  // Find the most recent ToolUse event where toolName === 'TodoWrite'
   // Events are ordered chronologically, so iterate backwards
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i];
 
-    // Only process PostToolUse events (After tool execution)
-    if (event.eventType === 'PostToolUse') {
-      const postEvent = event as PostToolUseEvent;
+    // Only process ToolUse events
+    if (event.eventType === 'ToolUse') {
+      const toolEvent = event as ToolUseEvent;
 
-      if (postEvent.toolName === 'TodoWrite') {
-        const toolInput = postEvent.toolInput;
+      if (toolEvent.toolName === 'TodoWrite') {
+        const toolInput = toolEvent.toolInput;
 
         // Validate that toolInput.todos exists and is an array
         if (toolInput && 'todos' in toolInput && Array.isArray(toolInput.todos)) {

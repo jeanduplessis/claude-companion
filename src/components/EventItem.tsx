@@ -13,10 +13,8 @@ interface EventItemProps {
 export const EventItem: React.FC<EventItemProps> = ({ event, isSelected = false, basePath }) => {
   const getEventTypeColor = (eventType: string): (text: string) => string => {
     switch (eventType) {
-      case 'PreToolUse':
+      case 'ToolUse':
         return colors.preTool;
-      case 'PostToolUse':
-        return colors.postTool;
       case 'UserPromptSubmit':
         return colors.userPrompt;
       case 'Notification':
@@ -37,16 +35,43 @@ export const EventItem: React.FC<EventItemProps> = ({ event, isSelected = false,
 
   const prefix = isSelected ? '→' : ' ';
 
-  // Add status indicator for PostToolUse hooks
+  // Add status indicator based on hook execution
   let statusIndicator = '';
-  if (event.eventType === 'PostToolUse' && 'hookExitCode' in event && event.hookExitCode !== undefined) {
+  if ('hookExitCode' in event && event.hookExitCode !== undefined) {
     statusIndicator = event.hookExitCode === 0 ? colors.success('✓') : colors.error('✗');
+  }
+
+  // Add hook response indicators
+  let hookResponseInfo = '';
+  if ('hookResponse' in event && event.hookResponse) {
+    const resp = event.hookResponse;
+
+    // Show permission decision for PreToolUse
+    if ('permissionDecision' in resp && resp.permissionDecision) {
+      const decision = resp.permissionDecision;
+      const icon = decision === 'allow' ? '✓' : decision === 'deny' ? '✗' : '?';
+      hookResponseInfo = ` ${colors.dim(`[${icon} ${decision}]`)}`;
+    }
+    // Show block decision for other hook types
+    else if ('decision' in resp && resp.decision === 'block') {
+      hookResponseInfo = ` ${colors.warning('[blocked]')}`;
+    }
+
+    // Show continue=false indicator
+    if (resp.continue === false) {
+      hookResponseInfo += ` ${colors.error('[stopped]')}`;
+    }
+
+    // Show system message indicator
+    if (resp.systemMessage) {
+      hookResponseInfo += ` ${colors.dim('[msg]')}`;
+    }
   }
 
   return (
     <Box>
       <Text>
-        {prefix} <Text dimColor>{time}</Text> {colorFn(`[${typeLabel.padEnd(8)}]`)} {statusIndicator && `${statusIndicator} `}{summary}
+        {prefix} <Text dimColor>{time}</Text> {colorFn(`[${typeLabel.padEnd(7)}]`)} {statusIndicator && `${statusIndicator} `}{summary}{hookResponseInfo}
       </Text>
     </Box>
   );

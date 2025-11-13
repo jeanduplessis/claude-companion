@@ -23,10 +23,10 @@ for (let i = 0; i < args.length; i++) {
 
   if (arg === '-h' || arg === '--help') {
     console.log(`
-Claude Commander - Hook Event Monitor for Claude Code
+Claude Companion - Hook Event Monitor for Claude Code
 
 Usage:
-  claude-commander [command] [options] [session-id]
+  claude-companion [command] [options] [session-id]
 
 Commands:
   setup               Run interactive setup wizard to configure hooks
@@ -39,10 +39,10 @@ Options:
   [session-id]        Connect to specific session (default: latest)
 
 Examples:
-  claude-commander setup              # Configure Claude Code hooks
-  claude-commander                    # Connect to latest session
-  claude-commander abc123xyz          # Connect to specific session
-  claude-commander --skip-check       # Start without checking hooks
+  claude-companion setup              # Configure Claude Code hooks
+  claude-companion                    # Connect to latest session
+  claude-companion abc123xyz          # Connect to specific session
+  claude-companion --skip-check       # Start without checking hooks
 
 Keyboard Shortcuts (in monitor mode):
   q                   Quit

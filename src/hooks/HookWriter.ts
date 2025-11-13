@@ -2,12 +2,12 @@
  * Hook Writer for Claude Code
  *
  * This utility writes hook events to a log file (JSONL format) that can be
- * read by the claude-commander TUI monitor.
+ * read by the claude-companion TUI monitor.
  *
  * Usage:
  *   1. Copy this file to your Claude Code hooks directory
  *   2. Import and use in your hooks configuration
- *   3. Run claude-commander to monitor events
+ *   3. Run claude-companion to monitor events
  */
 
 import fs from 'fs';

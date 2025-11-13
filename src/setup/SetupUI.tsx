@@ -36,7 +36,7 @@ export const SetupUI: React.FC<SetupUIProps> = ({ onComplete }) => {
         // Transition to monitoring (we're running from main app)
         onComplete();
       } else {
-        // Exit (we're running standalone `claude-commander setup`)
+        // Exit (we're running standalone `claude-companion setup`)
         exit();
       }
     } else if (step === 'error' && input === ' ') {
@@ -82,13 +82,13 @@ export const SetupUI: React.FC<SetupUIProps> = ({ onComplete }) => {
       <Box flexDirection="column" padding={1}>
         <Box borderStyle="double" borderColor={inkColors.borderAccent} paddingX={2} paddingY={1} marginBottom={1}>
           <Text bold color={inkColors.borderAccent}>
-            Claude Commander - Hook Setup
+            Claude Companion - Hook Setup
           </Text>
         </Box>
 
         <Box flexDirection="column" marginY={1} paddingX={1}>
-          <Text>Welcome to Claude Commander setup!</Text>
-          <Text color={inkColors.dim}>This wizard will configure Claude Code hooks to work with Claude Commander.</Text>
+          <Text>Welcome to Claude Companion setup!</Text>
+          <Text color={inkColors.dim}>This wizard will configure Claude Code hooks to work with Claude Companion.</Text>
         </Box>
 
         <Box flexDirection="column" marginY={1} paddingX={1}>
@@ -100,7 +100,7 @@ export const SetupUI: React.FC<SetupUIProps> = ({ onComplete }) => {
 
         <Box flexDirection="column" marginY={1} paddingX={1}>
           <Text bold color={inkColors.text}>Events captured:</Text>
-          <Text color={inkColors.dim}>  PreToolUse, PostToolUse, UserPromptSubmit, Notification, SessionStart, SessionEnd</Text>
+          <Text color={inkColors.dim}>  ToolUse, UserPromptSubmit, Notification, SessionStart, SessionEnd</Text>
         </Box>
 
         <Box marginTop={1} paddingX={1}>
@@ -162,7 +162,7 @@ export const SetupUI: React.FC<SetupUIProps> = ({ onComplete }) => {
       ? path.join(os.homedir(), '.claude', 'settings.json')
       : path.join(process.cwd(), '.claude', 'settings.local.json');
 
-    const scriptPath = path.join(os.homedir(), '.config', 'claude-code', 'claude-commander-hook.sh');
+    const scriptPath = path.join(os.homedir(), '.config', 'claude-code', 'claude-companion-hook.sh');
 
     const methodItems = [
       {
@@ -186,7 +186,7 @@ export const SetupUI: React.FC<SetupUIProps> = ({ onComplete }) => {
         </Box>
 
         <Box marginBottom={1} paddingX={1}>
-          <Text color={inkColors.dim}>How should hooks communicate with Claude Commander?</Text>
+          <Text color={inkColors.dim}>How should hooks communicate with Claude Companion?</Text>
         </Box>
 
         <Box paddingX={2}>
@@ -237,7 +237,7 @@ export const SetupUI: React.FC<SetupUIProps> = ({ onComplete }) => {
 
   // Complete
   if (step === 'complete') {
-    const scriptPath = path.join(os.homedir(), '.config', 'claude-code', 'claude-commander-hook.sh');
+    const scriptPath = path.join(os.homedir(), '.config', 'claude-code', 'claude-companion-hook.sh');
 
     return (
       <Box flexDirection="column" padding={1}>
@@ -265,14 +265,14 @@ export const SetupUI: React.FC<SetupUIProps> = ({ onComplete }) => {
           <Box flexDirection="column" marginY={1} paddingX={1}>
             <Text bold color={inkColors.text}>Next steps:</Text>
             <Text>  1. Start a Claude Code session</Text>
-            <Text>  2. Run: <Text color={inkColors.info}>claude-commander</Text></Text>
+            <Text>  2. Run: <Text color={inkColors.info}>claude-companion</Text></Text>
             <Text>  3. Watch events appear in real-time!</Text>
           </Box>
         )}
 
         <Box marginTop={1} paddingX={1} borderStyle="single" borderColor={inkColors.info} padding={1}>
           <Text color={inkColors.dim}>
-            💡 Tip: Use keyboard shortcuts in Claude Commander:
+            💡 Tip: Use keyboard shortcuts in Claude Companion:
             {'\n'}   • 1-6: Toggle event types
             {'\n'}   • f: Toggle filters
             {'\n'}   • c: Clear events

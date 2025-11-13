@@ -1,13 +1,31 @@
-# Claude Commander Setup Guide
+# Claude Companion Setup Guide
 
-This guide explains how to configure Claude Code hooks to work with Claude Commander.
+This guide explains how to configure Claude Code hooks to work with Claude Companion and capture **ALL hook events and their complete data**.
+
+## What Data Is Captured?
+
+Claude Companion automatically captures **everything**:
+
+1. **Hook Input** - What Claude Code sends to your hooks:
+   - Event types (ToolUse, UserPromptSubmit, Stop, SubagentStop, PreCompact, SessionStart, SessionEnd, Notification)
+   - Tool names and parameters
+   - User prompts
+   - Session metadata (session ID, cwd, permission mode)
+   - Event-specific data (notification types, stop reasons, compact triggers, session sources, etc.)
+
+2. **Hook Output** - What your hooks return to Claude Code:
+   - Exit codes (0 = success, 2 = block, other = error)
+   - Stdout/stderr output
+   - Structured JSON responses (permission decisions, block decisions, system messages)
+
+There's **one setup mode** that captures everything comprehensively.
 
 ## Quick Setup (Recommended)
 
 Run the interactive setup wizard:
 
 ```bash
-claude-commander setup
+claude-companion setup
 ```
 
 The wizard will guide you through:
@@ -42,7 +60,7 @@ The setup wizard creates the following:
 
 ### For Bash Script Method:
 
-1. **Hook Script** (`~/.config/claude-code/claude-commander-hook.sh`)
+1. **Hook Script** (`~/.config/claude-code/claude-companion-hook.sh`)
    - Executable bash script that receives hook events
    - Creates/manages log files in `~/.claude-code/hooks/`
    - Writes event metadata to `.meta` files
@@ -55,9 +73,75 @@ The setup wizard creates the following:
 ### For TypeScript Method:
 
 1. **Hook Module** (`hooks.ts`)
-   - TypeScript file that imports `claude-commander/hooks`
+   - TypeScript file that imports `claude-companion/hooks`
    - Uses the `HookWriter` class to write events to log files
-   - Requires `claude-commander` as a dependency in your project
+   - Requires `claude-companion` as a dependency in your project
+
+## Integrating Your Own Custom Hooks
+
+If you already have custom hook logic, Claude Companion can wrap it and capture all data:
+
+### Option 1: Environment Variable
+
+```bash
+# Set in your shell profile (~/.bashrc, ~/.zshrc, etc.)
+export CUSTOM_HOOK_SCRIPT="$HOME/.config/claude-code/my-custom-hook.sh"
+
+# Then restart Claude Code
+claude-code chat
+```
+
+### Option 2: Edit the Generated Script
+
+```bash
+# Edit the generated hook script
+nano ~/.config/claude-code/claude-companion-hook.sh
+
+# Find this line near the top:
+CUSTOM_HOOK_SCRIPT="${CUSTOM_HOOK_SCRIPT:-}"
+
+# Change it to:
+CUSTOM_HOOK_SCRIPT="$HOME/.config/claude-code/my-custom-hook.sh"
+```
+
+### How It Works
+
+When you set a custom hook script, Claude Companion will:
+
+1. Receive hook input from Claude Code
+2. Log the input data
+3. Pass the input to your custom hook script
+4. Capture your hook's output (stdout, stderr, exit code)
+5. Parse any structured JSON responses
+6. Log all hook output data
+7. Forward the output back to Claude Code
+
+This means you get **complete observability** without modifying your existing hook logic!
+
+### What's Captured
+
+The setup wizard automatically captures **everything**:
+
+**Hook Input:**
+- All 8 event types (ToolUse, UserPromptSubmit, Stop, SubagentStop, PreCompact, SessionStart, SessionEnd, Notification)
+- All event-specific fields
+- All session metadata
+
+**Hook Output (if custom hook is configured):**
+- Exit codes (0 = success, 2 = block, other = error)
+- Raw stdout and stderr
+- Structured JSON responses:
+  - Permission decisions (`allow`, `deny`, `ask`)
+  - Block decisions and reasons
+  - `continue` flags (stops Claude execution)
+  - System messages
+  - Additional context
+  - Updated tool inputs
+
+**Visual Indicators in TUI:**
+- ✓/✗ for hook success/failure
+- `[✓ allow]`, `[✗ deny]`, `[? ask]` for permission decisions
+- `[blocked]`, `[stopped]`, `[msg]` for other responses
 
 ## Manual Configuration
 
@@ -71,7 +155,7 @@ After running setup, verify the configuration:
 
 ```bash
 # For user settings with bash script
-ls -la ~/.config/claude-code/claude-commander-hook.sh
+ls -la ~/.config/claude-code/claude-companion-hook.sh
 ls -la ~/.config/claude-code/hooks.json
 
 # For user settings with TypeScript
@@ -90,14 +174,14 @@ ls -la ./.claude/hooks.ts
    claude-code chat
    ```
 
-2. In another terminal, start Claude Commander:
+2. In another terminal, start Claude Companion:
    ```bash
-   claude-commander
+   claude-companion
    ```
 
 3. Type a message in Claude Code and press Enter
 
-4. You should see events appearing in Claude Commander!
+4. You should see events appearing in Claude Companion!
 
 ## Troubleshooting
 
@@ -123,13 +207,13 @@ ls -la ./.claude/hooks.ts
 
 2. **Check hook script is executable:**
    ```bash
-   ls -l ~/.config/claude-code/claude-commander-hook.sh
+   ls -l ~/.config/claude-code/claude-companion-hook.sh
    ```
    Should show `-rwxr-xr-x` (executable)
 
 3. **Test hook script manually:**
    ```bash
-   echo '{"eventType":"Test"}' | ~/.config/claude-code/claude-commander-hook.sh
+   echo '{"eventType":"Test"}' | ~/.config/claude-code/claude-companion-hook.sh
    ```
 
 4. **Check Claude Code hook configuration:**
@@ -137,25 +221,25 @@ ls -la ./.claude/hooks.ts
    cat ~/.config/claude-code/hooks.json
    ```
 
-### "Module not found: claude-commander/hooks"
+### "Module not found: claude-companion/hooks"
 
-This happens when using TypeScript hooks without having `claude-commander` installed in your project:
+This happens when using TypeScript hooks without having `claude-companion` installed in your project:
 
 ```bash
-npm install claude-commander
+npm install claude-companion
 # or
-npm link claude-commander
+npm link claude-companion
 ```
 
 ## Uninstalling
 
-To remove Claude Commander hooks:
+To remove Claude Companion hooks:
 
 ```bash
 # Remove user settings
 rm ~/.config/claude-code/hooks.json
 rm ~/.config/claude-code/hooks.ts
-rm ~/.config/claude-code/claude-commander-hook.sh
+rm ~/.config/claude-code/claude-companion-hook.sh
 
 # Remove project settings
 rm ./.claude/hooks.json
@@ -187,20 +271,20 @@ Edit the generated `hooks.json` to only monitor specific events:
 
 ### Multiple Sessions
 
-Claude Commander automatically creates separate log files for each session using unique session IDs. Each session gets:
+Claude Companion automatically creates separate log files for each session using unique session IDs. Each session gets:
 - Its own log file: `~/.claude-code/hooks/<session-id>.jsonl`
 - Its own metadata file: `~/.claude-code/hooks/<session-id>.meta`
 
 You can connect to specific sessions:
 ```bash
-claude-commander <session-id>
+claude-companion <session-id>
 ```
 
 ## Next Steps
 
 Once setup is complete:
 
-1. **Start monitoring:** Run `claude-commander`
+1. **Start monitoring:** Run `claude-companion`
 2. **Learn keyboard shortcuts:** Press keys 1-6 to toggle event types, `f` for filters, `c` to clear
 3. **Explore features:** Try filtering events, watching multiple tools, etc.
 

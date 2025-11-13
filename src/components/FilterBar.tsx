@@ -10,8 +10,7 @@ interface FilterBarProps {
 }
 
 const EVENT_TYPES: HookEventType[] = [
-  'PreToolUse',
-  'PostToolUse',
+  'ToolUse',
   'UserPromptSubmit',
   'Notification',
   'SessionStart',

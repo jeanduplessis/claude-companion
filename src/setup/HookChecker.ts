@@ -50,11 +50,11 @@ export class HookChecker {
       userConfigPath = hasUserSettingsHooks ? userSettings : userHooksTs;
       details += `Found user hooks: ${userConfigPath}\n`;
 
-      // Check if it's a claude-commander configuration
+      // Check if it's a claude-companion configuration
       if (this.isClaudeCommanderConfig(userConfigPath)) {
-        details += '✓ User hooks configured for Claude Commander\n';
+        details += '✓ User hooks configured for Claude Companion\n';
       } else {
-        details += '⚠ User hooks exist but may not be configured for Claude Commander\n';
+        details += '⚠ User hooks exist but may not be configured for Claude Companion\n';
       }
     }
 
@@ -62,11 +62,11 @@ export class HookChecker {
       projectConfigPath = hasProjectSettingsHooks ? projectSettings : projectHooksTs;
       details += `Found project hooks: ${projectConfigPath}\n`;
 
-      // Check if it's a claude-commander configuration
+      // Check if it's a claude-companion configuration
       if (this.isClaudeCommanderConfig(projectConfigPath)) {
-        details += '✓ Project hooks configured for Claude Commander\n';
+        details += '✓ Project hooks configured for Claude Companion\n';
       } else {
-        details += '⚠ Project hooks exist but may not be configured for Claude Commander\n';
+        details += '⚠ Project hooks exist but may not be configured for Claude Companion\n';
       }
     }
 
@@ -102,7 +102,7 @@ export class HookChecker {
   }
 
   /**
-   * Check if a config file is configured for Claude Commander
+   * Check if a config file is configured for Claude Companion
    */
   private isClaudeCommanderConfig(configPath: string): boolean {
     try {
@@ -111,11 +111,11 @@ export class HookChecker {
       // Check for our markers
       if (configPath.endsWith('.json')) {
         // Check if JSON config mentions our hook script
-        return content.includes('claude-commander-hook.sh') ||
-               content.includes('claude-commander');
+        return content.includes('claude-companion-hook.sh') ||
+               content.includes('claude-companion');
       } else if (configPath.endsWith('.ts')) {
         // Check if TS config imports our hook writer
-        return content.includes('claude-commander/hooks') ||
+        return content.includes('claude-companion/hooks') ||
                content.includes('getHookWriter');
       }
 
@@ -139,7 +139,7 @@ export class HookChecker {
     const result = this.check();
 
     if (!result.isConfigured) {
-      return 'Claude Code hooks are not configured for Claude Commander.';
+      return 'Claude Code hooks are not configured for Claude Companion.';
     }
 
     const locations: string[] = [];

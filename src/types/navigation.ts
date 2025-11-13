@@ -1,4 +1,4 @@
-export type ViewType = 'dashboard' | 'hooks' | 'context' | 'git' | 'todos';
+export type ViewType = 'dashboard' | 'events' | 'context' | 'git' | 'todos' | 'otel';
 
 export interface ViewTab {
   id: ViewType;
@@ -8,7 +8,8 @@ export interface ViewTab {
 
 export const VIEW_TABS: ViewTab[] = [
   { id: 'dashboard', label: 'Dashboard', shortcut: 'd' },
-  { id: 'hooks', label: 'Hooks', shortcut: 'h' },
+  { id: 'events', label: 'Events', shortcut: 'e' },
+  { id: 'otel', label: 'OTel Metrics', shortcut: 'o' },
   { id: 'context', label: 'Context Window', shortcut: 'w' },
   { id: 'git', label: 'Git', shortcut: 'g' },
   { id: 'todos', label: 'Todos', shortcut: 't' }

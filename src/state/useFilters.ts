@@ -15,8 +15,7 @@ export interface UseFiltersResult {
 }
 
 const ALL_EVENT_TYPES: HookEventType[] = [
-  'PreToolUse',
-  'PostToolUse',
+  'ToolUse',
   'UserPromptSubmit',
   'Stop',
   'SubagentStop',

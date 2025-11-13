@@ -1,4 +1,4 @@
-# Claude Commander
+# Claude Companion
 
 A real-time TUI (Terminal User Interface) companion app for monitoring Claude Code hook events.
 
@@ -23,14 +23,14 @@ A real-time TUI (Terminal User Interface) companion app for monitoring Claude Co
 ### Install Globally
 
 ```bash
-npm install -g claude-commander
+npm install -g claude-companion
 ```
 
 ### Install from Source
 
 ```bash
-git clone https://github.com/yourusername/claude-commander.git
-cd claude-commander
+git clone https://github.com/yourusername/claude-companion.git
+cd claude-companion
 npm install
 npm run build
 npm link
@@ -41,10 +41,10 @@ npm link
 ### Super Simple: Just Run It!
 
 ```bash
-claude-commander
+claude-companion
 ```
 
-**That's it!** On first run, Claude Commander will:
+**That's it!** On first run, Claude Companion will:
 1. Check if hooks are configured
 2. If not, offer to run the setup wizard
 3. Guide you through automatic configuration
@@ -55,7 +55,7 @@ claude-commander
 You can also run setup explicitly:
 
 ```bash
-claude-commander setup
+claude-companion setup
 ```
 
 This will:
@@ -71,12 +71,138 @@ This will:
    claude-code chat
    ```
 
-2. In another terminal, launch Claude Commander (if not already running):
+2. In another terminal, launch Claude Companion (if not already running):
    ```bash
-   claude-commander
+   claude-companion
    ```
 
 3. Watch events appear in real-time!
+
+---
+
+## Capturing Complete Hook Data
+
+Claude Companion captures **ALL hook events and ALL their data**, including both:
+1. **Hook Input** - Data Claude Code sends to hooks (event details, tool parameters, etc.)
+2. **Hook Output** - Responses from hooks (decisions, exit codes, structured JSON responses)
+
+### Understanding Hook Data Flow
+
+```
+Claude Code
+    ↓ (hook input via stdin)
+Claude Companion Hook Script
+    ↓ (optionally delegates to your custom hooks)
+Your Custom Hook Logic (optional)
+    ↓ (hook output via stdout/stderr/exit code)
+Claude Companion (logs everything)
+    ↓ (forwards output back)
+Claude Code (processes hook response)
+```
+
+The hook script sits in the middle and captures **both directions** of this flow while optionally delegating to your custom hook logic.
+
+### Hook Output Data
+
+The hook script automatically captures structured JSON responses that hooks can return:
+
+#### ToolUse Hook Responses
+```json
+{
+  "permissionDecision": "allow" | "deny" | "ask",
+  "permissionDecisionReason": "Why this decision was made",
+  "updatedInput": { "modified": "parameters" },
+  "additionalContext": "Context for Claude to consider",
+  "continue": false,
+  "stopReason": "Why execution stopped",
+  "systemMessage": "Message shown to user"
+}
+```
+
+#### UserPromptSubmit Hook Responses
+```json
+{
+  "decision": "block",
+  "reason": "Why the prompt was blocked",
+  "additionalContext": "Additional context for Claude"
+}
+```
+
+#### Stop/SubagentStop Hook Responses
+```json
+{
+  "decision": "block",
+  "reason": "Why Claude should continue (blocks stopping)"
+}
+```
+
+All hook responses can include common fields:
+- `continue`: false to stop Claude entirely
+- `stopReason`: Message shown when stopped
+- `suppressOutput`: Hide stdout from transcript
+- `systemMessage`: Warning/info for user
+
+### Integrating Your Own Custom Hooks
+
+If you already have custom hook logic, you can integrate it seamlessly:
+
+```bash
+# Set environment variable to your custom hook script
+export CUSTOM_HOOK_SCRIPT="$HOME/.config/claude-code/my-custom-hook.sh"
+
+# Or edit the generated hook script and set:
+CUSTOM_HOOK_SCRIPT="$HOME/.config/claude-code/my-custom-hook.sh"
+```
+
+Claude Companion will:
+1. Capture the hook input from Claude Code
+2. Pass it to your custom hook
+3. Capture your hook's output (stdout, stderr, exit code)
+4. Parse any structured JSON responses
+5. Forward everything back to Claude Code
+6. Log all of it for monitoring in the TUI
+
+### Viewing Hook Output in the TUI
+
+Claude Companion displays hook execution metadata in the event list:
+
+- ✓/✗ indicators show hook exit codes (success/failure)
+- `[✓ allow]`, `[✗ deny]`, `[? ask]` show permission decisions
+- `[blocked]` shows when hooks block operations
+- `[stopped]` shows when hooks stop Claude execution
+- `[msg]` indicates system messages are present
+
+Use the detailed view (coming soon) to see full hook output and structured responses.
+
+### Complete Event Data Reference
+
+Claude Companion captures these fields for each event type:
+
+**All Events:**
+- `id`, `eventType`, `timestamp`, `sessionId`
+- `transcriptPath`, `cwd`, `permissionMode`
+- `hookCommand`, `hookOutput`, `hookExitCode`, `hookResponse`
+
+**ToolUse:**
+- `toolName`, `toolInput`, `toolResult`, `duration`
+
+**UserPromptSubmit:**
+- `prompt`
+
+**Stop / SubagentStop:**
+- `reason`, `stopHookActive`
+
+**Notification:**
+- `notificationType`, `message`
+
+**PreCompact:**
+- `trigger` (`manual` | `auto`), `customInstructions`
+
+**SessionStart:**
+- `source` (`startup` | `resume` | `clear` | `compact`)
+
+**SessionEnd:**
+- `reason` (`clear` | `logout` | `prompt_input_exit` | `other`)
 
 ---
 
@@ -89,14 +215,14 @@ If you prefer to configure hooks manually, you have two options:
 Import the hook writer in your Claude Code hooks configuration (`.claude/hooks.ts` or `~/.config/claude-code/hooks.ts`):
 
 ```typescript
-import { getHookWriter } from 'claude-commander/hooks';
+import { getHookWriter } from 'claude-companion/hooks';
 
 const writer = getHookWriter();
 
 export const hooks = {
   async onPreToolUse(context: any) {
     writer.writeEvent({
-      eventType: 'PreToolUse',
+      eventType: 'ToolUse',
       toolName: context.toolName,
       toolInput: context.parameters,
       cwd: process.cwd(),
@@ -106,7 +232,7 @@ export const hooks = {
 
   async onPostToolUse(context: any, result: any) {
     writer.writeEvent({
-      eventType: 'PostToolUse',
+      eventType: 'ToolUse',
       toolName: context.toolName,
       toolInput: context.parameters,
       toolResult: result,
@@ -149,7 +275,7 @@ The setup wizard can also configure bash script-based hooks, which work without 
 ### Command Line Options
 
 ```bash
-claude-commander [command] [options] [session-id]
+claude-companion [command] [options] [session-id]
 
 Commands:
   setup               Run interactive setup wizard to configure hooks
@@ -161,9 +287,9 @@ Options:
   [session-id]        Connect to specific session (default: latest)
 
 Examples:
-  claude-commander setup              # Configure Claude Code hooks
-  claude-commander                    # Connect to latest session
-  claude-commander abc123xyz          # Connect to specific session
+  claude-companion setup              # Configure Claude Code hooks
+  claude-companion                    # Connect to latest session
+  claude-companion abc123xyz          # Connect to specific session
 ```
 
 ### Keyboard Shortcuts
@@ -176,16 +302,15 @@ Examples:
 | `f` | Toggle filter bar visibility |
 | `c` | Clear all events |
 | `r` | Reset filters (show all event types) |
-| `1` | Toggle PreToolUse events |
-| `2` | Toggle PostToolUse events |
-| `3` | Toggle UserPromptSubmit events |
-| `4` | Toggle Notification events |
-| `5` | Toggle SessionStart events |
-| `6` | Toggle SessionEnd events |
+| `1` | Toggle ToolUse events |
+| `2` | Toggle UserPromptSubmit events |
+| `3` | Toggle Notification events |
+| `4` | Toggle SessionStart events |
+| `5` | Toggle SessionEnd events |
 
 ### Automatic Session Switching
 
-When you're monitoring a Claude Code session and start a new session (e.g., by typing `/clear` in Claude Code), Claude Commander will automatically detect the new session and prompt you to switch:
+When you're monitoring a Claude Code session and start a new session (e.g., by typing `/clear` in Claude Code), Claude Companion will automatically detect the new session and prompt you to switch:
 
 - A notification banner will appear showing the current and new session IDs
 - Press `s` to switch to the new session (events will be cleared and new session monitoring begins)
@@ -195,10 +320,9 @@ This ensures you never miss events from a new session after restarting Claude Co
 
 ### Event Types
 
-Claude Commander displays all Claude Code hook events:
+Claude Companion displays all Claude Code hook events:
 
-- **PreToolUse** - Before a tool is executed (e.g., Read, Write, Bash)
-- **PostToolUse** - After a tool completes execution
+- **ToolUse** - Tool execution (unified from before/after hooks)
 - **UserPromptSubmit** - When you submit a prompt to Claude
 - **Notification** - System notifications from Claude Code
 - **SessionStart** - When a Claude Code session begins
@@ -209,14 +333,14 @@ Claude Commander displays all Claude Code hook events:
 
 ## Architecture
 
-Claude Commander uses **JSONL log files** for efficient, real-time communication:
+Claude Companion uses **JSONL log files** for efficient, real-time communication:
 
 ```
 Claude Code Process
        │
        │ Hook System
        ▼
-   Hook Writer ────► Log File (JSONL) ────► Claude Commander TUI
+   Hook Writer ────► Log File (JSONL) ────► Claude Companion TUI
                      ~/.claude-code/hooks/      (Event Display)
                      <session-id>.jsonl
 ```
@@ -234,7 +358,7 @@ Claude Code Process
 ### Project Structure
 
 ```
-claude-commander/
+claude-companion/
 ├── src/
 │   ├── index.tsx              # CLI entry point
 │   ├── types/                 # TypeScript type definitions
